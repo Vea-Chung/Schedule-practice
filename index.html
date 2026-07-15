@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimal Schedule | Timetable Planner & Optimizer</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS for Excel Download/Upload -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fa-solid fa-calendar-days logo-icon"></i>
+                <span class="brand-text">OptimaSchedule</span>
+                <span class="badge">v1.0</span>
+            </div>
+            <div class="nav-actions">
+                <button id="howToUseBtn" class="btn btn-secondary">
+                    <i class="fa-regular fa-circle-question"></i> How to Use
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="app-container">
+        <!-- Sidebar / Config Panel -->
+        <aside class="config-sidebar">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fa-solid fa-sliders"></i> Configuration</h2>
+                    <span class="subtitle">Set parameters manually or upload template</span>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Step 1: Upload / Download Template -->
+                    <div class="config-section">
+                        <h3>1. Data Management</h3>
+                        <div class="data-actions-vertical">
+                            <button id="downloadTemplateBtn" class="btn btn-outline btn-full">
+                                <i class="fa-solid fa-file-arrow-down"></i> Download Excel Template
+                            </button>
+                            <div class="upload-zone" id="uploadZone">
+                                <input type="file" id="excelFileInput" accept=".xlsx, .xls" class="file-input-hidden">
+                                <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                                <div class="upload-text">
+                                    <strong>Click to upload</strong> or drag Excel here
+                                </div>
+                                <div class="upload-subtext">Only .xlsx or .xls files</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Date & Plan Settings -->
+                    <div class="config-section">
+                        <h3>2. Planning Horizon</h3>
+                        
+                        <div class="form-group">
+                            <label for="startDate">
+                                Start Date
+                                <span class="info-trigger" data-tooltip="The first day of the schedule period. Example: 2026-08-01.">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </span>
+                            </label>
+                            <input type="date" id="startDate" class="form-control" value="2026-08-01">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="endDate">
+                                End Date
+                                <span class="info-trigger" data-tooltip="The last day of the schedule period. Example: 2026-08-31.">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </span>
+                            </label>
+                            <input type="date" id="endDate" class="form-control" value="2026-08-07">
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                Default Weekend Rest Days
+                                <span class="info-trigger" data-tooltip="Days of the week when resources are absent by default. Users can customize individuals later.">
+                                    <i class="fa-solid fa-circle-info"></i>
+                                </span>
+                            </label>
+                            <div class="checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="weekendSat" checked> Sat
+                                </label>
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="weekendSun" checked> Sun
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button id="generateScheduleBtn" class="btn btn-primary btn-full btn-large">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Schedule
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right Side: Results & Details -->
+        <section class="results-panel">
+            <!-- Messages / Alerts / Status Panel -->
+            <div id="statusNotification" class="alert alert-info hidden">
+                <i class="fa-solid fa-circle-info alert-icon"></i>
+                <div class="alert-content">
+                    <h4 class="alert-title">Info</h4>
+                    <p class="alert-message">Please download the template, fill in your data, and upload it, or verify the settings above.</p>
+                </div>
+            </div>
+
+            <!-- Loader -->
+            <div id="loader" class="loader-container hidden">
+                <div class="spinner"></div>
+                <p>Running Solver Engine...</p>
+            </div>
+
+            <!-- Output Container -->
+            <div id="outputContainer" class="card results-card hidden">
+                <div class="results-header">
+                    <div class="results-meta">
+                        <h2><i class="fa-solid fa-calendar-check"></i> Generated Timetable</h2>
+                        <div class="alternates-tabs" id="alternatesTabs">
+                            <!-- Alternate tabs will be injected here -->
+                        </div>
+                    </div>
+                    <div class="results-actions">
+                        <button id="exportScheduleBtn" class="btn btn-outline btn-sm">
+                            <i class="fa-solid fa-download"></i> Export Results
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tabs for Table vs. Violations -->
+                <div class="tabs-nav">
+                    <button class="tab-btn active" data-tab="gridTab">
+                        <i class="fa-solid fa-table-cells"></i> Calendar View
+                    </button>
+                    <button class="tab-btn" data-tab="violationsTab">
+                        <i class="fa-solid fa-circle-exclamation"></i> Violations & Warnings <span class="badge badge-danger" id="violationsCount">0</span>
+                    </button>
+                </div>
+
+                <div class="card-body">
+                    <!-- Tab 1: Grid View -->
+                    <div id="gridTab" class="tab-content active">
+                        <div class="table-responsive">
+                            <table class="schedule-table" id="scheduleTable">
+                                <thead>
+                                    <!-- Dynamic headers will be injected here -->
+                                </thead>
+                                <tbody>
+                                    <!-- Dynamic rows will be injected here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Violations list -->
+                    <div id="violationsTab" class="tab-content">
+                        <div class="violations-container" id="violationsList">
+                            <!-- Violations will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Initial state/Welcome screen -->
+            <div id="welcomeScreen" class="card welcome-card">
+                <div class="card-body text-center">
+                    <div class="welcome-icon-container">
+                        <i class="fa-solid fa-calendar-days welcome-icon"></i>
+                    </div>
+                    <h2>No Schedule Generated Yet</h2>
+                    <p class="text-muted">Upload an Excel file using the template provided in the Configuration sidebar, set the dates, and click "Generate Schedule" to compute the optimal roster.</p>
+                    <div class="welcome-actions">
+                        <button id="downloadTemplateWelcomeBtn" class="btn btn-primary">
+                            <i class="fa-solid fa-file-arrow-down"></i> Download Excel Template
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- How to Use Modal -->
+    <div id="howToUseModal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2><i class="fa-solid fa-circle-info"></i> How to Use OptimaSchedule</h2>
+                <button id="closeModalBtn" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <ol class="guide-list">
+                    <li>
+                        <div class="step-num">1</div>
+                        <div class="step-detail">
+                            <strong>Download the Template</strong>
+                            <p>Click "Download Excel Template" from the sidebar to get a configured layout. This ensures your inputs conform exactly to the solver's requirements.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="step-num">2</div>
+                        <div class="step-detail">
+                            <strong>Fill in Your Data</strong>
+                            <p>Open the spreadsheet and complete the sheets: Setup, Resources, Departments, and Capability Mappings. Do not rename columns or sheets.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="step-num">3</div>
+                        <div class="step-detail">
+                            <strong>Upload & Configure</strong>
+                            <p>Drag your completed spreadsheet into the upload area. Adjust the Start and End dates in the sidebar to match your planning horizon.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="step-num">4</div>
+                        <div class="step-detail">
+                            <strong>Generate & Roster</strong>
+                            <p>Click "Generate Schedule". The engine calculates optimal assignments client-side, showing alternative options (if any) or highlighting violations/reasons if no perfect fit exists.</p>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+            <div class="modal-footer">
+                <button id="closeModalFooterBtn" class="btn btn-primary">Got it!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="solver.js"></script>
+    <script src="template.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
